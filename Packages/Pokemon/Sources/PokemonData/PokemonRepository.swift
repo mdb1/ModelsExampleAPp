@@ -36,7 +36,7 @@ public final class PokemonRepository: ObservableObject {
     }
 
     @MainActor
-    public func removeVehicle(id: String) async {
+    public func removePokemon(id: String) async {
         switch pokemonsPublisher.value {
         case .success(let pokemons):
             do {
@@ -69,10 +69,11 @@ extension PokemonRepository {
         var deletePokemon: (_ id: String) async throws -> ()
 
         static var `default`: Self {
-            Self.init {
-                return try await PokemonService().getAllPokemons()
+            let service = PokemonService()
+            return Self.init {
+                return try await service.getAllPokemons()
             } deletePokemon: { pokemonId in
-                return try await PokemonService().removePokemon(id: pokemonId)
+                return try await service.removePokemon(id: pokemonId)
             }
         }
     }
