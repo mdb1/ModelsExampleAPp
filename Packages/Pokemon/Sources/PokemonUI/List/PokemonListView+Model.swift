@@ -11,6 +11,7 @@ extension PokemonListView {
         var pokemons: [Pokemon] = []
         var isLoading: Bool = false
         var error: Error? = nil
+        var isDisplayingDeletionErrorToast: Bool = false
     }
 }
 
@@ -33,6 +34,9 @@ extension PokemonListView.Model {
             error = nil
         case .failure(let e):
             error = e
+            if e as? PokemonRepository.Errors == .deletionError {
+                isDisplayingDeletionErrorToast = true
+            }
             isLoading = false
         }
     }

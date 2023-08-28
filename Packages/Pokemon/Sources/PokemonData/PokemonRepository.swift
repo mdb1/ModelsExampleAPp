@@ -13,6 +13,7 @@ import Foundation
 public final class PokemonRepository: ObservableObject {
     public var pokemonsPublisher = CurrentValueSubject<LoadingState<[Pokemon]>, Never>(.idle)
     private let dependencies: Dependencies
+    private var inMemoryPokemons: [Pokemon] = []
 
     public convenience init() {
         self.init(dependencies: .default)
@@ -21,45 +22,63 @@ public final class PokemonRepository: ObservableObject {
     init(dependencies: Dependencies) {
         self.dependencies = dependencies
     }
+}
 
+public extension PokemonRepository {
     @MainActor
-    public func loadAllPokemons() async {
+    func loadAllPokemons() async {
         pokemonsPublisher.send(.loading)
 
         do {
             let apiPokemons = try await dependencies.getAllPokemons()
             let pokemons = apiPokemons.map(\.uiModel)
-            pokemonsPublisher.send(.success(pokemons))
+            inMemoryPokemons = pokemons
+            pokemonsPublisher.send(.success(inMemoryPokemons))
         } catch {
             pokemonsPublisher.send(.failure(error))
         }
     }
 
     @MainActor
-    public func removePokemon(id: String) async {
-        switch pokemonsPublisher.value {
-        case .success(let pokemons):
-            do {
-                var mutablePokemons = pokemons
-                if let pokemonIndex = pokemons.firstIndex(where: { pokemon in
-                    pokemon.id == id
-                }) {
-                    pokemonsPublisher.send(.loading)
-                    try await dependencies.deletePokemon(id)
-                    mutablePokemons.remove(at: pokemonIndex)
-                    pokemonsPublisher.send(.success(mutablePokemons))
-                }
-            } catch {
-                pokemonsPublisher.send(.failure(error))
+    /// Removes the pokemon with the given id.
+    /// - Parameters:
+    ///   - id: the `id` of the pokemon.
+    ///   - optimisticDelete: if `true` the repository will send the updated list of pokemons automatically,
+    ///   while deleting with the API in the background. If the API call fails, the repository will re-publish the entire list.
+    func removePokemon(
+        id: String,
+        optimisticDelete: Bool = false
+    ) async {
+        do {
+            var mutablePokemons = inMemoryPokemons
+            mutablePokemons.removeAll { pokemon in
+                pokemon.id == id
             }
-        default:
-            ()
+            if optimisticDelete {
+                pokemonsPublisher.send(.success(mutablePokemons))
+            } else {
+                pokemonsPublisher.send(.loading)
+            }
+
+            // Delete the pokemon.
+            try await dependencies.deletePokemon(id)
+            // Refetch all the pokemons.
+            await loadAllPokemons()
+        } catch {
+            pokemonsPublisher.send(.failure(Errors.deletionError))
+            /// Re-Publish all the pokemons (without the deletion)
+            pokemonsPublisher.send(.success(inMemoryPokemons))
         }
     }
 
     @MainActor
-    public func wipe() {
+    func wipe() {
         pokemonsPublisher.send(.idle)
+        inMemoryPokemons = []
+    }
+
+    enum Errors: Error {
+        case deletionError
     }
 }
 
