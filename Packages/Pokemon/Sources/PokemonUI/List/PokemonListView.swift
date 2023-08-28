@@ -24,9 +24,8 @@ public struct PokemonListView: View {
                 // And every time we receive a value we update the state.
                 model.updateStates(with: newState)
             }
-            // Note: this should be a toast
-            .sheet(isPresented: $model.isDisplayingDeletionErrorToast) {
-                Text("Error removing pokemon")
+            .alert(isPresented: $model.isDisplayingDeletionErrorToast) {
+                Alert(title: Text("Error removing Pokemon"))
             }
         }
     }

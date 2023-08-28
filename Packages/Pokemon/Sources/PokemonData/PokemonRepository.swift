@@ -66,8 +66,8 @@ public extension PokemonRepository {
             await loadAllPokemons()
         } catch {
             pokemonsPublisher.send(.failure(Errors.deletionError))
-            /// Re-Publish all the pokemons (without the deletion)
-            pokemonsPublisher.send(.success(inMemoryPokemons))
+            /// Reload the pokemons.
+            await loadAllPokemons()
         }
     }
 
